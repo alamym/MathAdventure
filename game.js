@@ -48,7 +48,7 @@ resizeCanvas();
 // 遊戲狀態
 let gameState = 'MENU';
 let roomCount = 1;
-let cycleCount = 1; // 每一輪 (4+1)
+let cycleCount = 1;
 let score = 0;
 let hp = 3;
 let targetNum = 0;
@@ -167,20 +167,16 @@ function initRoom() {
 }
 
 function initNormalMode() {
-    // 難度遞增邏輯
     if (cycleCount === 1) {
-        // 第一輪：熱身，選因子數少的數字 (質數或簡單數字)
         const warmUpTargets = [6, 8, 10, 13, 14, 15, 17, 19, 21, 22];
         targetNum = warmUpTargets[Math.floor(Math.random() * warmUpTargets.length)];
     } else {
-        // 第二輪之後：難度增加，數字變大且因子變多
         targetNum = 24 + Math.floor(Math.random() * 30) + (cycleCount * 10);
     }
 
     factorsToFind = [];
     for (let i = 1; i <= targetNum; i++) if (targetNum % i === 0) factorsToFind.push(i);
 
-    // 放置目標數字 (不重複)
     const roomNumbers = new Set();
     factorsToFind.forEach(num => {
         let posX, posY, attempts = 0;
@@ -193,7 +189,6 @@ function initNormalMode() {
         roomNumbers.add(num);
     });
 
-    // 放置干擾數字 (不重複)
     let distractorsCount = 5 + cycleCount;
     for (let i = 0; i < distractorsCount; i++) {
         let n, posX, posY, attempts = 0;
@@ -214,7 +209,6 @@ function initNormalMode() {
 
 function initBossMode() {
     bossHp = 100;
-    // Boss 難度遞增
     if (cycleCount === 1) {
         targetNum = 2 + Math.floor(Math.random() * 8); // Round 1: 2-9
     } else {
@@ -222,7 +216,6 @@ function initBossMode() {
     }
 
     const roomNumbers = new Set();
-    // Boss 關卡目標：倍數
     for (let i = 0; i < 10; i++) {
         let isM = Math.random() > 0.4;
         let n;
@@ -268,7 +261,8 @@ function handleShot(sx, sy) {
                 } else {
                     if (!foundFactors.includes(obj.number)) {
                         foundFactors.push(obj.number);
-                        if (foundFactors.length >= Math.min(factorsToFind.length, 3)) {
+                        // 修正：必須找完所有因子
+                        if (foundFactors.length === factorsToFind.length) {
                             doorOpen = true;
                             isExiting = true;
                             gameObjects = [];
@@ -298,7 +292,7 @@ function updateUI() {
 function updateHP() { hpDisplay.innerText = "❤".repeat(hp); }
 function updateChecklist() {
     if (isBossMode) checklistDisplay.innerText = `Boss HP: ${bossHp}%`;
-    else checklistDisplay.innerText = `Found: ${foundFactors.length}/${Math.min(factorsToFind.length, 3)}`;
+    else checklistDisplay.innerText = `Factors: ${foundFactors.length}/${factorsToFind.length}`;
 }
 
 function endGame() {
@@ -395,6 +389,7 @@ function draw() {
             ctx.fillRect(VIRTUAL_WIDTH - 40, VIRTUAL_HEIGHT/2 - 50, 40, 100);
         }
         drawWarrior(player.x, player.y);
+        // 確保 Boss 會被畫出來
         if (isBossMode && bossHp > 0) drawBoss();
         gameObjects.forEach(obj => {
             ctx.fillStyle = '#0f380f';
