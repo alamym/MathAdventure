@@ -222,7 +222,7 @@ function handleShot(sx, sy) {
                 score += 20;
                 if (isBossMode) {
                     bossHp -= 25; bossShake = 10;
-                    if (bossHp <= 0) { isExiting = true; gameObjects = []; }
+                    if (bossHp <= 0) { isExiting = true; doorOpen = true; gameObjects = []; }
                 } else {
                     if (!foundFactors.includes(obj.number)) {
                         foundFactors.push(obj.number);
@@ -239,7 +239,7 @@ function handleShot(sx, sy) {
             }
             if (!isBossMode) gameObjects.splice(i, 1);
             scoreDisplay.innerText = score;
-            updateUI();
+            updateChecklist();
             break;
         }
     }
@@ -304,7 +304,11 @@ function update() {
     player.x += moveX * player.speed;
     player.y += moveY * player.speed;
 
-    player.x = Math.max(0, Math.min(VIRTUAL_WIDTH - player.width, player.x));
+    // 邊界限制：只有在非過場狀態才限制右邊界
+    player.x = Math.max(-60, player.x);
+    if (!isExiting) {
+        player.x = Math.min(VIRTUAL_WIDTH - player.width, player.x);
+    }
     player.y = Math.max(0, Math.min(VIRTUAL_HEIGHT - player.height, player.y));
 
     if (isEntering) { player.x += 4; if (player.x >= 100) isEntering = false; }
@@ -335,7 +339,7 @@ function draw() {
 
         // 畫數字 (統一顏色)
         gameObjects.forEach(obj => {
-            ctx.fillStyle = '#0f380f'; // Unified color for all numbers
+            ctx.fillStyle = '#0f380f';
             ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
             ctx.fillStyle = '#9bbc0f';
             ctx.font = 'bold 20px Arial';
