@@ -1,0 +1,120 @@
+body {
+    background-color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+#game-container {
+    position: relative;
+    border: 10px solid #999;
+    border-radius: 10px;
+    background-color: #8bac0f;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    overflow: hidden;
+}
+
+/* 開場選單樣式 */
+#start-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 800px;
+    height: 500px;
+    background-color: #8bac0f;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    text-align: center;
+    color: #0f380f;
+}
+
+#start-screen h1 {
+    font-size: 3.5rem;
+    margin-bottom: 10px;
+    line-height: 1;
+}
+
+#start-screen p {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+}
+
+#controls-hint {
+    background-color: #306230;
+    color: #8bac0f;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 30px;
+    line-height: 1.5;
+}
+
+#start-button {
+    background-color: #0f380f;
+    color: #9bbc0f;
+    border: none;
+    padding: 15px 40px;
+    font-size: 1.5rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #306230;
+}
+
+#start-button:hover {
+    background-color: #306230;
+    color: #fff;
+}
+
+#hud {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background-color: #306230;
+    color: #8bac0f;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+#target-val {
+    color: #d40000; /* 目標數字改為紅色 */
+    font-size: 1.4rem;
+}
+
+#factor-checklist {
+    background-color: #306230;
+    color: #9bbc0f;
+    padding: 5px 10px;
+    font-size: 0.9rem;
+    text-align: center;
+    border-bottom: 2px solid #0f380f;
+}
+
+canvas {
+    display: block;
+    background-color: #9bbc0f;
+}
+
+#instructions {
+    text-align: center;
+    padding: 5px;
+    font-size: 0.8rem;
+    color: #0f380f;
+    background-color: #8bac0f;
+}
+
+.found {
+    color: #9bbc0f;
+    text-decoration: none;
+    margin: 0 5px;
+}
+
+.missing {
+    margin: 0 5px;
+    font-weight: normal;
+}
