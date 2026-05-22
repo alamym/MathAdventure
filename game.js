@@ -239,7 +239,7 @@ function handleShot(sx, sy) {
             }
             if (!isBossMode) gameObjects.splice(i, 1);
             scoreDisplay.innerText = score;
-            updateUI();
+            updateChecklist();
             break;
         }
     }
@@ -304,8 +304,8 @@ function update() {
     player.x += moveX * player.speed;
     player.y += moveY * player.speed;
 
-    // 邊界限制：只有在非過場狀態才限制右邊界
-    player.x = Math.max(0, player.x);
+    // 邊界限制
+    player.x = Math.max(-60, player.x);
     if (!isExiting) {
         player.x = Math.min(VIRTUAL_WIDTH - player.width, player.x);
     }
@@ -322,6 +322,24 @@ function update() {
     }
 }
 
+function drawWarrior(x, y) {
+    ctx.fillStyle = '#0f380f';
+    // Head
+    ctx.fillRect(x + 6, y, 12, 12);
+    // Body
+    ctx.fillRect(x + 2, y + 12, 21, 18);
+    // Arms
+    ctx.fillRect(x, y + 15, 4, 15);
+    ctx.fillRect(x + 21, y + 15, 4, 15);
+    // Legs
+    ctx.fillRect(x + 4, y + 30, 6, 10);
+    ctx.fillRect(x + 15, y + 30, 6, 10);
+    // Eyes
+    ctx.fillStyle = '#9bbc0f';
+    ctx.fillRect(x + 8, y + 4, 3, 3);
+    ctx.fillRect(x + 14, y + 4, 3, 3);
+}
+
 function draw() {
     ctx.save();
     ctx.scale(scale, scale);
@@ -333,11 +351,10 @@ function draw() {
             ctx.fillRect(VIRTUAL_WIDTH - 40, VIRTUAL_HEIGHT/2 - 50, 40, 100);
         }
 
-        // 畫玩家
-        ctx.fillStyle = '#0f380f';
-        ctx.fillRect(player.x, player.y, player.width, player.height);
+        // 畫玩家 (人型戰士)
+        drawWarrior(player.x, player.y);
 
-        // 畫數字 (統一顏色)
+        // 畫數字
         gameObjects.forEach(obj => {
             ctx.fillStyle = '#0f380f';
             ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
