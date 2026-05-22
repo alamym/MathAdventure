@@ -82,7 +82,6 @@ const leaderboardKey = 'math_adventure_all_scores';
 // --- 輸入處理 ---
 window.addEventListener('keydown', e => {
     keys[e.code] = true;
-    // 在排行榜或結束畫面按 Space 回首頁
     if ((gameState === 'LEADERBOARD' || gameState === 'GAMEOVER' || gameState === 'WIN') && e.code === 'Space') {
         resetGame();
     }
@@ -113,7 +112,7 @@ submitScoreBtn.addEventListener('click', () => {
     const name = playerNameInput.value.trim() || "Anonymous";
     saveScore(name, score, cycleCount);
     nameInputContainer.style.display = 'none';
-    gameState = 'LEADERBOARD'; // 提交後跳轉到排行榜狀態
+    gameState = 'LEADERBOARD';
 });
 
 function startGame() {
@@ -257,7 +256,6 @@ function handleShot(sx, sy) {
                 score += 20;
                 if (isBossMode) {
                     bossHp -= 25; bossShake = 15;
-                    // 修正：Boss 模式下正確數字也要消失
                     gameObjects.splice(i, 1);
                     if (bossHp <= 0) {
                         score += 500;
@@ -362,6 +360,19 @@ function drawWarrior(x, y) {
     ctx.fillStyle = '#9bbc0f';
     ctx.fillRect(x + 8, y + 4, 3, 3);
     ctx.fillRect(x + 14, y + 4, 3, 3);
+
+    // 戰士頭頂血條 (3 次機會)
+    const barWidth = 30;
+    const barHeight = 4;
+    const bx = x + (player.width / 2) - (barWidth / 2);
+    const by = y - 10;
+
+    // 背景
+    ctx.fillStyle = '#0f380f';
+    ctx.fillRect(bx, by, barWidth, barHeight);
+    // 紅色血量
+    ctx.fillStyle = '#d40000';
+    ctx.fillRect(bx, by, (hp / 3) * barWidth, barHeight);
 }
 
 function drawBoss() {
@@ -378,10 +389,10 @@ function drawBoss() {
     ctx.beginPath(); ctx.arc(bx + 60, by + 70, 25, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#0f380f';
     ctx.beginPath(); ctx.arc(bx + 60, by + 70, 10, 0, Math.PI * 2); ctx.fill();
-    // Health Bar - 修正為紅色
+    // Health Bar
     ctx.fillStyle = '#0f380f';
     ctx.fillRect(VIRTUAL_WIDTH - 200, 50, 150, 20);
-    ctx.fillStyle = '#d40000'; // 紅色血條
+    ctx.fillStyle = '#d40000';
     ctx.fillRect(VIRTUAL_WIDTH - 200, 50, (bossHp / 100) * 150, 20);
 }
 
@@ -431,7 +442,6 @@ function draw() {
             ctx.fillText('GAME OVER', VIRTUAL_WIDTH/2, 120);
             ctx.font = '22px Arial';
             ctx.fillText(`Score: ${score}`, VIRTUAL_WIDTH/2, 170);
-            // 這裡不再直接顥示排行榜，交由輸入名字後的流程處理
         }
     }
     ctx.restore();
