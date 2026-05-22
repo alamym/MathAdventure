@@ -46,7 +46,7 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // 遊戲狀態
-let gameState = 'MENU';
+let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER, WIN, LEADERBOARD
 let roomCount = 1;
 let cycleCount = 1;
 let score = 0;
@@ -80,7 +80,13 @@ const keys = {};
 const leaderboardKey = 'math_adventure_all_scores';
 
 // --- 輸入處理 ---
-window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    // 在排行榜或結束畫面按 Space 回首頁
+    if ((gameState === 'LEADERBOARD' || gameState === 'GAMEOVER' || gameState === 'WIN') && e.code === 'Space') {
+        resetGame();
+    }
+});
 window.addEventListener('keyup', e => keys[e.code] = false);
 
 canvas.addEventListener('touchstart', e => {
@@ -107,7 +113,7 @@ submitScoreBtn.addEventListener('click', () => {
     const name = playerNameInput.value.trim() || "Anonymous";
     saveScore(name, score, cycleCount);
     nameInputContainer.style.display = 'none';
-    resetGame();
+    gameState = 'LEADERBOARD'; // 提交後跳轉到排行榜狀態
 });
 
 function startGame() {
@@ -150,7 +156,6 @@ function checkOverlap(x, y, others) {
 }
 
 function initRoom() {
-    // 每 5 關一個 Boss (1,2,3,4 關 factor, 第 5 關 Boss)
     isBossMode = (roomCount % 5 === 0);
     isEntering = true; isExiting = false;
     player.x = -50; player.y = 250;
@@ -210,14 +215,14 @@ function initNormalMode() {
 function initBossMode() {
     bossHp = 100;
     if (cycleCount === 1) {
-        targetNum = 2 + Math.floor(Math.random() * 8); // Round 1: 2-9
+        targetNum = 2 + Math.floor(Math.random() * 8);
     } else {
-        targetNum = 10 + Math.floor(Math.random() * 6); // Round 2+: 10-15
+        targetNum = 10 + Math.floor(Math.random() * 6);
     }
 
     const roomNumbers = new Set();
-    for (let i = 0; i < 10; i++) {
-        let isM = Math.random() > 0.4;
+    for (let i = 0; i < 12; i++) {
+        let isM = Math.random() > 0.5;
         let n;
         if (isM) {
             n = targetNum * (Math.floor(Math.random() * 6) + 1);
@@ -227,7 +232,7 @@ function initBossMode() {
 
         let posX, posY, attempts = 0;
         do {
-            posX = 150 + Math.random() * 400;
+            posX = 150 + Math.random() * 450;
             posY = 80 + Math.random() * 340;
             attempts++;
         } while (checkOverlap(posX, posY, gameObjects) && attempts < 100);
@@ -252,6 +257,8 @@ function handleShot(sx, sy) {
                 score += 20;
                 if (isBossMode) {
                     bossHp -= 25; bossShake = 15;
+                    // 修正：Boss 模式下正確數字也要消失
+                    gameObjects.splice(i, 1);
                     if (bossHp <= 0) {
                         score += 500;
                         isExiting = true;
@@ -261,7 +268,7 @@ function handleShot(sx, sy) {
                 } else {
                     if (!foundFactors.includes(obj.number)) {
                         foundFactors.push(obj.number);
-                        // 修正：必須找完所有因子
+                        gameObjects.splice(i, 1);
                         if (foundFactors.length === factorsToFind.length) {
                             doorOpen = true;
                             isExiting = true;
@@ -271,11 +278,11 @@ function handleShot(sx, sy) {
                 }
             } else {
                 hp--;
+                if (!isBossMode) gameObjects.splice(i, 1);
                 if (hp <= 0) endGame();
             }
-            if (!isBossMode) gameObjects.splice(i, 1);
             scoreDisplay.innerText = score;
-            updateChecklist();
+            updateUI();
             break;
         }
     }
@@ -371,10 +378,10 @@ function drawBoss() {
     ctx.beginPath(); ctx.arc(bx + 60, by + 70, 25, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#0f380f';
     ctx.beginPath(); ctx.arc(bx + 60, by + 70, 10, 0, Math.PI * 2); ctx.fill();
-    // Health Bar
+    // Health Bar - 修正為紅色
     ctx.fillStyle = '#0f380f';
     ctx.fillRect(VIRTUAL_WIDTH - 200, 50, 150, 20);
-    ctx.fillStyle = '#9bbc0f';
+    ctx.fillStyle = '#d40000'; // 紅色血條
     ctx.fillRect(VIRTUAL_WIDTH - 200, 50, (bossHp / 100) * 150, 20);
 }
 
@@ -389,7 +396,6 @@ function draw() {
             ctx.fillRect(VIRTUAL_WIDTH - 40, VIRTUAL_HEIGHT/2 - 50, 40, 100);
         }
         drawWarrior(player.x, player.y);
-        // 確保 Boss 會被畫出來
         if (isBossMode && bossHp > 0) drawBoss();
         gameObjects.forEach(obj => {
             ctx.fillStyle = '#0f380f';
@@ -406,16 +412,27 @@ function draw() {
             ctx.lineTo(lastShot.x, lastShot.y);
             ctx.stroke();
         }
-    } else if (gameState === 'GAMEOVER') {
+    } else if (gameState === 'GAMEOVER' || gameState === 'WIN' || gameState === 'LEADERBOARD') {
         ctx.fillStyle = '#0f380f';
         ctx.textAlign = 'center';
-        ctx.font = '40px Arial';
-        ctx.fillText('GAME OVER', VIRTUAL_WIDTH/2, 120);
-        ctx.font = '20px Arial';
-        const lb = getLeaderboard().slice(0, 10);
-        lb.forEach((r, i) => {
-            ctx.fillText(`${i+1}. ${r.name}: ${r.score}`, VIRTUAL_WIDTH/2, 170 + i*25);
-        });
+
+        if (gameState === 'LEADERBOARD') {
+            ctx.font = '35px Arial';
+            ctx.fillText('LEADERBOARD', VIRTUAL_WIDTH/2, 80);
+            ctx.font = '18px Arial';
+            const lb = getLeaderboard().slice(0, 12);
+            lb.forEach((r, i) => {
+                ctx.fillText(`${i+1}. ${r.name}: ${r.score} (Lvl ${r.level})`, VIRTUAL_WIDTH/2, 120 + i*25);
+            });
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('Press [Space] to Home', VIRTUAL_WIDTH/2, 460);
+        } else {
+            ctx.font = '40px Arial';
+            ctx.fillText('GAME OVER', VIRTUAL_WIDTH/2, 120);
+            ctx.font = '22px Arial';
+            ctx.fillText(`Score: ${score}`, VIRTUAL_WIDTH/2, 170);
+            // 這裡不再直接顥示排行榜，交由輸入名字後的流程處理
+        }
     }
     ctx.restore();
 }
