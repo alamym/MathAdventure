@@ -48,7 +48,7 @@ resizeCanvas();
 // 遊戲狀態
 let gameState = 'MENU';
 let roomCount = 1;
-let cycleCount = 1;
+let cycleCount = 1; // 每一輪 (4+1)
 let score = 0;
 let hp = 3;
 let targetNum = 0;
@@ -83,7 +83,6 @@ const leaderboardKey = 'math_adventure_all_scores';
 window.addEventListener('keydown', e => keys[e.code] = true);
 window.addEventListener('keyup', e => keys[e.code] = false);
 
-// 簡單觸控處理：點擊即射擊
 canvas.addEventListener('touchstart', e => {
     if (gameState !== 'PLAYING') return;
     e.preventDefault();
@@ -151,6 +150,7 @@ function checkOverlap(x, y, others) {
 }
 
 function initRoom() {
+    // 每 5 關一個 Boss (1,2,3,4 關 factor, 第 5 關 Boss)
     isBossMode = (roomCount % 5 === 0);
     isEntering = true; isExiting = false;
     player.x = -50; player.y = 250;
@@ -159,55 +159,92 @@ function initRoom() {
     gameObjects = [];
 
     if (isBossMode) {
-        targetNum = 2 + Math.floor(Math.random() * 8) + (cycleCount * 2);
         initBossMode();
     } else {
-        targetNum = 10 + Math.floor(Math.random() * 20) + (cycleCount * 5);
         initNormalMode();
     }
     updateUI();
 }
 
 function initNormalMode() {
+    // 難度遞增邏輯
+    if (cycleCount === 1) {
+        // 第一輪：熱身，選因子數少的數字 (質數或簡單數字)
+        const warmUpTargets = [6, 8, 10, 13, 14, 15, 17, 19, 21, 22];
+        targetNum = warmUpTargets[Math.floor(Math.random() * warmUpTargets.length)];
+    } else {
+        // 第二輪之後：難度增加，數字變大且因子變多
+        targetNum = 24 + Math.floor(Math.random() * 30) + (cycleCount * 10);
+    }
+
     factorsToFind = [];
     for (let i = 1; i <= targetNum; i++) if (targetNum % i === 0) factorsToFind.push(i);
 
-    // 放置目標數字
+    // 放置目標數字 (不重複)
+    const roomNumbers = new Set();
     factorsToFind.forEach(num => {
         let posX, posY, attempts = 0;
         do {
-            posX = 150 + Math.random() * 500;
+            posX = 150 + Math.random() * 550;
             posY = 80 + Math.random() * 340;
             attempts++;
-        } while (checkOverlap(posX, posY, gameObjects) && attempts < 50);
+        } while (checkOverlap(posX, posY, gameObjects) && attempts < 100);
         gameObjects.push({ x: posX, y: posY, width: 45, height: 45, number: num, isDistractor: false });
+        roomNumbers.add(num);
     });
 
-    // 放置干擾數字
-    for (let i = 0; i < 6; i++) {
+    // 放置干擾數字 (不重複)
+    let distractorsCount = 5 + cycleCount;
+    for (let i = 0; i < distractorsCount; i++) {
         let n, posX, posY, attempts = 0;
-        do { n = Math.floor(Math.random() * 60) + 1; } while (targetNum % n === 0);
         do {
-            posX = 150 + Math.random() * 500;
+            n = Math.floor(Math.random() * (targetNum + 20)) + 1;
+        } while (targetNum % n === 0 || roomNumbers.has(n));
+
+        do {
+            posX = 150 + Math.random() * 550;
             posY = 80 + Math.random() * 340;
             attempts++;
-        } while (checkOverlap(posX, posY, gameObjects) && attempts < 50);
+        } while (checkOverlap(posX, posY, gameObjects) && attempts < 100);
+
         gameObjects.push({ x: posX, y: posY, width: 45, height: 45, number: n, isDistractor: true });
+        roomNumbers.add(n);
     }
 }
 
 function initBossMode() {
     bossHp = 100;
+    // Boss 難度遞增
+    if (cycleCount === 1) {
+        targetNum = 2 + Math.floor(Math.random() * 8); // Round 1: 2-9
+    } else {
+        targetNum = 10 + Math.floor(Math.random() * 6); // Round 2+: 10-15
+    }
+
+    const roomNumbers = new Set();
+    // Boss 關卡目標：倍數
     for (let i = 0; i < 10; i++) {
         let isM = Math.random() > 0.4;
-        let n = isM ? targetNum * (Math.floor(Math.random() * 6) + 1) : Math.floor(Math.random() * 70) + 1;
+        let n;
+        if (isM) {
+            n = targetNum * (Math.floor(Math.random() * 6) + 1);
+        } else {
+            do { n = Math.floor(Math.random() * 100) + 1; } while (n % targetNum === 0 || roomNumbers.has(n));
+        }
+
         let posX, posY, attempts = 0;
         do {
             posX = 150 + Math.random() * 400;
             posY = 80 + Math.random() * 340;
             attempts++;
-        } while (checkOverlap(posX, posY, gameObjects) && attempts < 50);
-        gameObjects.push({ x: posX, y: posY, width: 50, height: 50, number: n, isDistractor: !(n % targetNum === 0) });
+        } while (checkOverlap(posX, posY, gameObjects) && attempts < 100);
+
+        gameObjects.push({
+            x: posX, y: posY, width: 50, height: 50,
+            number: n,
+            isDistractor: !(n % targetNum === 0)
+        });
+        roomNumbers.add(n);
     }
 }
 
@@ -221,8 +258,13 @@ function handleShot(sx, sy) {
             if (!obj.isDistractor) {
                 score += 20;
                 if (isBossMode) {
-                    bossHp -= 25; bossShake = 10;
-                    if (bossHp <= 0) { isExiting = true; doorOpen = true; gameObjects = []; }
+                    bossHp -= 25; bossShake = 15;
+                    if (bossHp <= 0) {
+                        score += 500;
+                        isExiting = true;
+                        doorOpen = true;
+                        gameObjects = [];
+                    }
                 } else {
                     if (!foundFactors.includes(obj.number)) {
                         foundFactors.push(obj.number);
@@ -273,25 +315,14 @@ function resetGame() {
     instructions.style.display = 'none';
     nameInputContainer.style.display = 'none';
     player.x = 100; player.y = 250;
-    score = 0;
-    hp = 3;
-    roomCount = 1;
-    cycleCount = 1;
+    score = 0; hp = 3; roomCount = 1; cycleCount = 1;
     startTime = Date.now();
     initRoom();
-    updateUI();
 }
 
 function update() {
-    if (gameState !== 'PLAYING') {
-        if ((gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'LEADERBOARD') && keys['Space']) {
-            resetGame();
-        }
-        return;
-    }
-
+    if (gameState !== 'PLAYING') return;
     elapsedTime = Date.now() - startTime;
-
     if (lastShot.timer > 0) lastShot.timer--;
     if (bossShake > 0) bossShake--;
 
@@ -304,19 +335,16 @@ function update() {
     player.x += moveX * player.speed;
     player.y += moveY * player.speed;
 
-    // 邊界限制
-    player.x = Math.max(-60, player.x);
-    if (!isExiting) {
-        player.x = Math.min(VIRTUAL_WIDTH - player.width, player.x);
-    }
+    player.x = Math.max(0, player.x);
+    if (!isExiting) player.x = Math.min(VIRTUAL_WIDTH - player.width, player.x);
     player.y = Math.max(0, Math.min(VIRTUAL_HEIGHT - player.height, player.y));
 
     if (isEntering) { player.x += 4; if (player.x >= 100) isEntering = false; }
     if (isExiting) {
         player.x += 6;
         if (player.x > VIRTUAL_WIDTH) {
-            roomCount++;
             if (isBossMode) cycleCount++;
+            roomCount++;
             initRoom();
         }
     }
@@ -324,20 +352,36 @@ function update() {
 
 function drawWarrior(x, y) {
     ctx.fillStyle = '#0f380f';
-    // Head
     ctx.fillRect(x + 6, y, 12, 12);
-    // Body
     ctx.fillRect(x + 2, y + 12, 21, 18);
-    // Arms
     ctx.fillRect(x, y + 15, 4, 15);
     ctx.fillRect(x + 21, y + 15, 4, 15);
-    // Legs
     ctx.fillRect(x + 4, y + 30, 6, 10);
     ctx.fillRect(x + 15, y + 30, 6, 10);
-    // Eyes
     ctx.fillStyle = '#9bbc0f';
     ctx.fillRect(x + 8, y + 4, 3, 3);
     ctx.fillRect(x + 14, y + 4, 3, 3);
+}
+
+function drawBoss() {
+    const bx = (VIRTUAL_WIDTH - 180) + (Math.random() * bossShake);
+    const by = 100 + (Math.random() * bossShake);
+    ctx.fillStyle = '#0f380f';
+    ctx.beginPath();
+    ctx.moveTo(bx, by + 50); ctx.lineTo(bx + 60, by); ctx.lineTo(bx + 120, by + 50);
+    ctx.lineTo(bx + 120, by + 150); ctx.lineTo(bx, by + 150);
+    ctx.fill();
+    ctx.fillRect(bx + 10, by - 20, 15, 30);
+    ctx.fillRect(bx + 95, by - 20, 15, 30);
+    ctx.fillStyle = '#9bbc0f';
+    ctx.beginPath(); ctx.arc(bx + 60, by + 70, 25, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#0f380f';
+    ctx.beginPath(); ctx.arc(bx + 60, by + 70, 10, 0, Math.PI * 2); ctx.fill();
+    // Health Bar
+    ctx.fillStyle = '#0f380f';
+    ctx.fillRect(VIRTUAL_WIDTH - 200, 50, 150, 20);
+    ctx.fillStyle = '#9bbc0f';
+    ctx.fillRect(VIRTUAL_WIDTH - 200, 50, (bossHp / 100) * 150, 20);
 }
 
 function draw() {
@@ -350,11 +394,8 @@ function draw() {
             ctx.fillStyle = '#0f380f';
             ctx.fillRect(VIRTUAL_WIDTH - 40, VIRTUAL_HEIGHT/2 - 50, 40, 100);
         }
-
-        // 畫玩家 (人型戰士)
         drawWarrior(player.x, player.y);
-
-        // 畫數字
+        if (isBossMode && bossHp > 0) drawBoss();
         gameObjects.forEach(obj => {
             ctx.fillStyle = '#0f380f';
             ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
@@ -363,7 +404,6 @@ function draw() {
             ctx.textAlign = 'center';
             ctx.fillText(obj.number, obj.x + obj.width/2, obj.y + obj.height/2 + 7);
         });
-
         if (lastShot.timer > 0) {
             ctx.strokeStyle = '#0f380f';
             ctx.beginPath();
@@ -382,7 +422,6 @@ function draw() {
             ctx.fillText(`${i+1}. ${r.name}: ${r.score}`, VIRTUAL_WIDTH/2, 170 + i*25);
         });
     }
-
     ctx.restore();
 }
 
