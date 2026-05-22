@@ -40,7 +40,7 @@ function resizeCanvas() {
 
     canvas.width = newWidth;
     canvas.height = newHeight;
-    scale = Math.max(newWidth / 800, 0.1); // 確保 scale 不為 0
+    scale = Math.max(newWidth / 800, 0.1);
 }
 
 window.addEventListener('resize', resizeCanvas);
@@ -81,18 +81,36 @@ const keys = {};
 const leaderboardKey = 'math_adventure_all_scores';
 
 // --- 輸入處理 ---
-window.addEventListener('keydown', e => keys[e.code] = true);
-window.addEventListener('keyup', e => keys[e.code] = false);
+window.addEventListener('keydown', e => {
+    if (gameState === 'PLAYING' && gameActive && !isEntering && !isExiting) keys[e.code] = true;
+    if ((gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'LEADERBOARD') && e.code === 'Space') keys[e.code] = true;
+});
 
-// 觸控移動 (虛擬搖桿)
+window.addEventListener('keyup', e => {
+    if (gameState === 'PLAYING' || gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'LEADERBOARD') keys[e.code] = false;
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (gameState !== 'PLAYING' || !gameActive || isEntering || isExiting) return;
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = (e.clientX - rect.left) / scale;
+    mouse.y = (e.clientY - rect.top) / scale;
+});
+
+canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    if (gameState !== 'PLAYING' || !gameActive || isEntering || isExiting) return;
+    handleShot(mouse.x, mouse.y);
+});
+
 canvas.addEventListener('touchstart', e => {
     if (gameState !== 'PLAYING') return;
+    e.preventDefault();
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
     const tx = (touch.clientX - rect.left) / scale;
     const ty = (touch.clientY - rect.top) / scale;
 
-    // 如果點擊左半邊，當作移動
     if (tx < 400) {
         virtualJoystick.active = true;
         virtualJoystick.startX = touch.clientX;
@@ -100,16 +118,14 @@ canvas.addEventListener('touchstart', e => {
         virtualJoystick.curX = touch.clientX;
         virtualJoystick.curY = touch.clientY;
     } else {
-        // 點擊右半邊，當作射擊
         handleShot(tx, ty);
     }
 }, { passive: false });
 
 canvas.addEventListener('touchmove', e => {
     if (virtualJoystick.active) {
-        const touch = e.touches[0];
-        virtualJoystick.curX = touch.clientX;
-        virtualJoystick.curY = touch.clientY;
+        virtualJoystick.curX = e.touches[0].clientX;
+        virtualJoystick.curY = e.touches[0].clientY;
     }
     e.preventDefault();
 }, { passive: false });
@@ -118,21 +134,17 @@ canvas.addEventListener('touchend', () => {
     virtualJoystick.active = false;
 });
 
-canvas.addEventListener('mousedown', e => {
-    if (gameState !== 'PLAYING') return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) / scale;
-    const my = (e.clientY - rect.top) / scale;
-    handleShot(mx, my);
+startButton.addEventListener('click', () => {
+    if (gameState === 'MENU') startGame();
+    else if (gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'LEADERBOARD') resetGame();
 });
-
-startButton.addEventListener('click', startGame);
 
 submitScoreBtn.addEventListener('click', () => {
     const name = playerNameInput.value.trim() || "Anonymous";
     saveScore(name, score, cycleCount);
     nameInputContainer.style.display = 'none';
-    resetGame();
+    gameState = 'LEADERBOARD'; // Update state to show leaderboard
+    showLeaderboardScreen();
 });
 
 function startGame() {
@@ -148,19 +160,17 @@ function startGame() {
 }
 
 function saveScore(name, finalScore, level) {
-    // 1. 存入 LocalStorage (本地備份)
     const records = JSON.parse(localStorage.getItem(leaderboardKey) || "[]");
     records.push({ name, score: finalScore, level, date: new Date().toLocaleString() });
     localStorage.setItem(leaderboardKey, JSON.stringify(records));
 
-    // 2. 傳送到 Google Sheets (如果有 URL)
     if (GOOGLE_SCRIPT_URL) {
         fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors', // 重要：避免跨網域問題
+            mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, score: finalScore, level })
-        }).then(() => console.log("Score sent to Google Sheets")).catch(e => console.error(e));
+        }).then(() => console.log("Score sent to Google Sheets")).catch(e => console.error("Error sending score to Google Sheets:", e));
     }
 }
 
@@ -171,7 +181,7 @@ function getLeaderboard() {
 function initRoom() {
     isBossMode = (roomCount % 5 === 0);
     isEntering = true; isExiting = false;
-    player.x = -50; player.y = 250;
+    player.x = -50; player.y = canvas.height / 2; // Start off-screen left, centered vertically
 
     if (isBossMode) {
         targetNum = 2 + Math.floor(Math.random() * 8) + (cycleCount * 2);
@@ -190,6 +200,7 @@ function initNormalMode() {
     doorOpen = false;
     gameObjects = [];
 
+    // Add factors to the screen
     factorsToFind.forEach(num => {
         gameObjects.push({
             x: 150 + Math.random() * 500,
@@ -199,7 +210,8 @@ function initNormalMode() {
         });
     });
 
-    for (let i = 0; i < 5; i++) {
+    // Add distractors
+    for (let i = 0; i < 5 + cycleCount; i++) {
         let n;
         do { n = Math.floor(Math.random() * 50) + 1; } while (targetNum % n === 0);
         gameObjects.push({
@@ -214,9 +226,9 @@ function initNormalMode() {
 function initBossMode() {
     bossHp = 100;
     gameObjects = [];
-    for (let i = 0; i < 8; i++) {
-        let isM = Math.random() > 0.5;
-        let n = isM ? targetNum * (Math.floor(Math.random() * 5) + 1) : Math.floor(Math.random() * 50) + 1;
+    for (let i = 0; i < 10 + cycleCount * 2; i++) { // More objects in boss mode
+        let isM = Math.random() > 0.4; // Higher chance for multiples
+        let n = isM ? targetNum * (Math.floor(Math.random() * 6) + 1) : Math.floor(Math.random() * 70) + 1;
         gameObjects.push({
             x: 150 + Math.random() * 400,
             y: 50 + Math.random() * 400,
@@ -228,7 +240,7 @@ function initBossMode() {
 
 function handleShot(sx, sy) {
     if (!gameActive) return;
-    lastShot = { x: sx, y: sy, timer: 10 };
+    lastShot = { x: sx, y: sy, timer: 15 }; // Longer trail visibility
 
     for (let i = gameObjects.length - 1; i >= 0; i--) {
         const obj = gameObjects[i];
@@ -236,12 +248,17 @@ function handleShot(sx, sy) {
             if (!obj.isDistractor) {
                 score += 20;
                 if (isBossMode) {
-                    bossHp -= 25; bossShake = 10;
+                    bossHp -= 25; bossShake = 15;
                     if (bossHp <= 0) { isExiting = true; gameObjects = []; }
                 } else {
                     if (!foundFactors.includes(obj.number)) {
                         foundFactors.push(obj.number);
-                        if (foundFactors.length >= Math.min(factorsToFind.length, 3)) { doorOpen = true; isExiting = true; gameObjects = []; }
+                        // Condition to open door: collected at least 3 factors OR all available factors if less than 3
+                        if (foundFactors.length >= Math.min(factorsToFind.length, 3)) {
+                            doorOpen = true;
+                            isExiting = true;
+                            gameObjects = [];
+                        }
                     }
                 }
             } else {
@@ -250,15 +267,14 @@ function handleShot(sx, sy) {
             }
             if (!isBossMode) gameObjects.splice(i, 1);
             scoreDisplay.innerText = score;
-            updateChecklist();
+            updateUI(); // Refresh UI elements
             break;
         }
     }
 }
 
 function updateUI() {
-    roomDisplay.innerText = roomCount;
-    targetLabel.innerText = isBossMode ? "Multiple of:" : "Factor of:";
+    roomDisplay.innerText = isBossMode ? `BOSS (Cycle ${cycleCount})` : `Room ${roomCount} (Cycle ${cycleCount})`;
     targetValDisplay.innerText = targetNum;
     updateHP();
     updateChecklist();
@@ -266,13 +282,19 @@ function updateUI() {
 
 function updateHP() { hpDisplay.innerText = "❤".repeat(hp); }
 function updateChecklist() {
-    if (isBossMode) checklistDisplay.innerText = `Boss HP: ${bossHp}%`;
-    else checklistDisplay.innerText = `Found: ${foundFactors.length}/${Math.min(factorsToFind.length, 3)}`;
+    if (isBossMode) checklistDisplay.innerText = `Boss HP: ${Math.max(0, bossHp)}%`;
+    else checklistDisplay.innerText = `Factors found: ${foundFactors.length}/${factorsToFind.length}`;
 }
 
 function endGame() {
     gameActive = false;
     gameState = 'GAMEOVER';
+    nameInputContainer.style.display = 'block';
+}
+
+function winGame() {
+    gameActive = false;
+    gameState = 'WIN';
     nameInputContainer.style.display = 'block';
 }
 
@@ -282,26 +304,49 @@ function resetGame() {
     hud.style.display = 'none';
     factorChecklist.style.display = 'none';
     instructions.style.display = 'none';
+    nameInputContainer.style.display = 'none'; // Hide input on reset
+    player.x = 100; player.y = canvas.height / 2; // Reset player position for new game
+    score = 0;
+    hp = 3;
+    roomCount = 1;
+    cycleCount = 1;
+    startTime = Date.now();
+    initRoom(); // Re-initialize for a new game
+    updateUI();
 }
 
 function update() {
-    if (gameState !== 'PLAYING') return;
+    if (gameState !== 'PLAYING') {
+        if ((gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'LEADERBOARD') && keys['Space']) {
+            resetGame();
+        }
+        return;
+    }
+
     elapsedTime = Date.now() - startTime;
+
     if (lastShot.timer > 0) lastShot.timer--;
     if (bossShake > 0) bossShake--;
 
-    // 移動處理 (鍵盤)
+    // Player Movement (Keyboard)
     let moveX = 0, moveY = 0;
     if (keys['ArrowLeft']) moveX = -1;
     if (keys['ArrowRight']) moveX = 1;
     if (keys['ArrowUp']) moveY = -1;
     if (keys['ArrowDown']) moveY = 1;
 
-    // 移動處理 (觸控)
+    // Player Movement (Touch - Virtual Joystick)
     if (virtualJoystick.active) {
-        moveX = (virtualJoystick.curX - virtualJoystick.startX) / 50;
-        moveY = (virtualJoystick.curY - virtualJoystick.startY) / 50;
-        // 限制最大速度
+        const dx = virtualJoystick.curX - virtualJoystick.startX;
+        const dy = virtualJoystick.curY - virtualJoystick.startY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance > 75) { // Normalize movement if joystick moved far enough
+            moveX = dx / distance;
+            moveY = dy / distance;
+        } else {
+            moveX = dx / 50;
+            moveY = dy / 50;
+        }
         moveX = Math.max(-1, Math.min(1, moveX));
         moveY = Math.max(-1, Math.min(1, moveY));
     }
@@ -309,19 +354,71 @@ function update() {
     player.x += moveX * player.speed;
     player.y += moveY * player.speed;
 
-    // 邊界限制
-    player.x = Math.max(0, Math.min(800 - player.width, player.x));
-    player.y = Math.max(0, Math.min(500 - player.height, player.y));
+    // Boundary Checks for Player
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
 
-    if (isEntering) { player.x += 4; if (player.x >= 100) isEntering = false; }
-    if (isExiting) {
-        player.x += 6;
-        if (player.x > 800) {
+    // Screen Transition Logic
+    if (isEntering) {
+        player.x += 4;
+        if (player.x >= 100) isEntering = false;
+    } else if (isExiting) {
+        player.x += 6; // Move player towards the exit
+        // Smoothly move player towards center of the exit door if needed
+        const exitY = canvas.height / 2 - 25; // Adjust based on door's visual center
+        player.y += (exitY - player.y) * 0.1;
+
+        if (player.x > canvas.width) { // Transition to next room/level
+            if (isBossMode) {
+                cycleCount++;
+            }
             roomCount++;
-            if (isBossMode) cycleCount++;
-            initRoom();
+            // Check for win condition (e.g., after X rooms or Y cycles)
+            if (roomCount > 10 && !isBossMode) { // Example: win after 10 normal rooms
+                winGame();
+            } else {
+                initRoom(); // Setup next room
+            }
         }
     }
+}
+
+function drawWarrior(x, y) {
+    ctx.fillStyle = '#0f380f'; // Darkest green
+    ctx.fillRect(x + 6 * scale, y, 12 * scale, 12 * scale);
+    ctx.fillRect(x + 2 * scale, y + 12 * scale, 21 * scale, 18 * scale);
+    ctx.fillRect(x, y + 15 * scale, 4 * scale, 15 * scale);
+    ctx.fillRect(x + 21 * scale, y + 15 * scale, 4 * scale, 15 * scale);
+    ctx.fillRect(x + 4 * scale, y + 30 * scale, 6 * scale, 10 * scale);
+    ctx.fillRect(x + 15 * scale, y + 30 * scale, 6 * scale, 10 * scale);
+
+    ctx.fillStyle = '#9bbc0f'; // Light green
+    ctx.fillRect(x + 8 * scale, y + 4 * scale, 3 * scale, 3 * scale);
+    ctx.fillRect(x + 14 * scale, y + 4 * scale, 3 * scale, 3 * scale);
+}
+
+function drawBoss() {
+    const bx = (canvas.width - 180) + (Math.random() * bossShake);
+    const by = 100 + (Math.random() * bossShake);
+
+    ctx.fillStyle = '#0f380f';
+    ctx.beginPath();
+    ctx.moveTo(bx, by + 50 * scale); ctx.lineTo(bx + 60 * scale, by); ctx.lineTo(bx + 120 * scale, by + 50 * scale);
+    ctx.lineTo(bx + 120 * scale, by + 150 * scale); ctx.lineTo(bx, by + 150 * scale);
+    ctx.fill();
+
+    ctx.fillRect(bx + 10 * scale, by - 20 * scale, 15 * scale, 30 * scale);
+    ctx.fillRect(bx + 95 * scale, by - 20 * scale, 15 * scale, 30 * scale);
+
+    ctx.fillStyle = bossHp < 50 ? "red" : '#9bbc0f';
+    ctx.beginPath(); ctx.arc(bx + 60 * scale, by + 70 * scale, 25 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#0f380f';
+    ctx.beginPath(); ctx.arc(bx + 60 * scale, by + 70 * scale, 10 * scale, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = '#306230';
+    ctx.fillRect(canvas.width - 200 * scale, 50 * scale, 150 * scale, 20 * scale);
+    ctx.fillStyle = 'red';
+    ctx.fillRect(canvas.width - 200 * scale, 50 * scale, (bossHp / 100) * 150 * scale, 20 * scale);
 }
 
 function draw() {
@@ -330,19 +427,15 @@ function draw() {
     ctx.clearRect(0, 0, 800, 500);
 
     if (gameState === 'PLAYING') {
-        // 畫門
         if (doorOpen || isExiting) {
             ctx.fillStyle = '#0f380f';
-            ctx.fillRect(760, 200, 40, 100);
+            ctx.fillRect(760, canvas.height / 2 - 50, 40, 100);
         }
 
-        // 畫玩家
-        ctx.fillStyle = '#0f380f';
-        ctx.fillRect(player.x, player.y, player.width, player.height);
+        drawWarrior(player.x, player.y);
 
-        // 畫物件
         gameObjects.forEach(obj => {
-            ctx.fillStyle = '#0f380f';
+            ctx.fillStyle = obj.isDistractor ? '#d40000' : '#0f380f';
             ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
             ctx.fillStyle = '#9bbc0f';
             ctx.font = '20px Arial';
@@ -350,35 +443,109 @@ function draw() {
             ctx.fillText(obj.number, obj.x + obj.width/2, obj.y + obj.height/2 + 7);
         });
 
-        // 畫射擊線
         if (lastShot.timer > 0) {
             ctx.strokeStyle = '#0f380f';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
             ctx.beginPath();
             ctx.moveTo(player.x + player.width/2, player.y + player.height/2);
             ctx.lineTo(lastShot.x, lastShot.y);
             ctx.stroke();
+            ctx.setLineDash([]);
         }
 
-        // 畫搖桿提示 (手機)
+        if (isBossMode && bossHp > 0) drawBoss();
+
+        // Virtual Joystick Visualisation
         if (virtualJoystick.active) {
             ctx.strokeStyle = 'rgba(15, 56, 15, 0.3)';
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc((virtualJoystick.startX - canvas.getBoundingClientRect().left)/scale, (virtualJoystick.startY - canvas.getBoundingClientRect().top)/scale, 50, 0, Math.PI*2);
+            ctx.arc(virtualJoystick.startX - canvas.getBoundingClientRect().left, virtualJoystick.startY - canvas.getBoundingClientRect().top, 50, 0, Math.PI*2);
             ctx.stroke();
+            ctx.fillStyle = 'rgba(15, 56, 15, 0.5)';
+            ctx.beginPath();
+            ctx.arc(virtualJoystick.curX - canvas.getBoundingClientRect().left, virtualJoystick.curY - canvas.getBoundingClientRect().top, 25, 0, Math.PI*2);
+            ctx.fill();
         }
     } else if (gameState === 'GAMEOVER') {
-        ctx.fillStyle = '#0f380f';
-        ctx.textAlign = 'center';
-        ctx.font = '40px Arial';
-        ctx.fillText('GAME OVER', 400, 150);
-        ctx.font = '20px Arial';
-        const lb = getLeaderboard().slice(0, 8); // 畫面上顯示前 8 名
-        lb.forEach((r, i) => {
-            ctx.fillText(`${i+1}. ${r.name}: ${r.score}`, 400, 200 + i*25);
-        });
+        drawGameOverScreen();
+    } else if (gameState === 'WIN') {
+        drawWinScreen();
+    } else if (gameState === 'LEADERBOARD') {
+        drawLeaderboardScreen();
     }
 
     ctx.restore();
+}
+
+function drawGameOverScreen() {
+    ctx.fillStyle = "rgba(15, 56, 15, 0.9)";
+    ctx.fillRect(0, 0, 800, 500);
+
+    ctx.fillStyle = '#d40000';
+    ctx.textAlign = 'center';
+    ctx.font = `bold ${40/scale}px Arial`;
+    ctx.fillText("WARRIOR FALLEN", 400, 90);
+
+    ctx.fillStyle = '#9bbc0f';
+    ctx.font = `${26/scale}px Arial`;
+    ctx.fillText(`Final Score: ${score}`, 400, 150);
+    ctx.fillText(`Time: ${Math.floor(elapsedTime/1000)}s | Cycle: ${cycleCount}`, 400, 190);
+
+    ctx.font = `${22/scale}px Arial`;
+    const lb = getLeaderboard().slice(0, 8);
+    if (lb.length === 0) {
+        ctx.fillText("No records yet!", 400, 240);
+    } else {
+        lb.forEach((r, i) => {
+            ctx.fillText(`${i+1}. ${r.name}: ${r.score}`, 400, 240 + i*25);
+        });
+    }
+
+    ctx.font = `${22/scale}px Arial`;
+    ctx.fillText("Press [Space] to play again", 400, 500 - 50);
+}
+
+function drawWinScreen() {
+    ctx.fillStyle = "rgba(15, 56, 15, 0.9)";
+    ctx.fillRect(0, 0, 800, 500);
+
+    ctx.fillStyle = '#9bbc0f';
+    ctx.textAlign = 'center';
+    ctx.font = `bold ${40/scale}px Arial`;
+    ctx.fillText("MISSION ACCOMPLISHED!", 400, 90);
+
+    ctx.font = `${26/scale}px Arial`;
+    ctx.fillText(`Final Score: ${score}`, 400, 150);
+    ctx.fillText(`Time: ${Math.floor(elapsedTime/1000)}s | Final Cycle: ${cycleCount}`, 400, 190);
+
+    ctx.font = `${22/scale}px Arial`;
+    ctx.fillText("Press [Space] to play again", 400, 500 - 50);
+}
+
+function drawLeaderboardScreen() {
+    ctx.fillStyle = "rgba(15, 56, 15, 0.9)";
+    ctx.fillRect(0, 0, 800, 500);
+
+    ctx.fillStyle = '#9bbc0f';
+    ctx.textAlign = 'center';
+    ctx.font = `bold ${40/scale}px Arial`;
+    ctx.fillText("HIGH SCORES", 400, 90);
+
+    const lb = getLeaderboard();
+    if (lb.length === 0) {
+        ctx.font = `${20/scale}px Arial`;
+        ctx.fillText("No records yet!", 400, 150);
+    } else {
+        lb.forEach((entry, i) => {
+            ctx.font = `${20/scale}px Arial`;
+            ctx.fillText(`#${i+1} - ${entry.name}: ${entry.score} (Lvl ${entry.level})`, 400, 150 + (i * 30));
+        });
+    }
+
+    ctx.font = `${22/scale}px Arial`;
+    ctx.fillText("Press [Space] to play again", 400, 500 - 50);
 }
 
 function gameLoop() {
@@ -387,4 +554,7 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// Initialize game state
+initRoom();
+updateUI();
 gameLoop();
