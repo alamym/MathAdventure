@@ -239,7 +239,7 @@ function handleShot(sx, sy) {
             }
             if (!isBossMode) gameObjects.splice(i, 1);
             scoreDisplay.innerText = score;
-            updateChecklist();
+            updateUI();
             break;
         }
     }
@@ -305,7 +305,7 @@ function update() {
     player.y += moveY * player.speed;
 
     // 邊界限制：只有在非過場狀態才限制右邊界
-    player.x = Math.max(-60, player.x);
+    player.x = Math.max(0, player.x);
     if (!isExiting) {
         player.x = Math.min(VIRTUAL_WIDTH - player.width, player.x);
     }
