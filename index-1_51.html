@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Math Sense Adventure</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Sense Adventure v1.6.0</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,27 +12,36 @@
             <h1>MATH SENSE<br>ADVENTURE</h1>
             <p>Master Factors & Multiples!</p>
             <div id="controls-hint">
-                [Arrow Keys] to Move<br>
-                [Mouse Click] to Shoot Numbers
+                [Arrows/Touch] to Move<br>
+                [Click/Tap] to Shoot Numbers
             </div>
             <button id="start-button">START MISSION</button>
         </div>
 
         <div id="hud" style="display: none;">
             <div id="room-info">Room: <span id="room-num">1</span></div>
-            <div id="target-display"><span id="target-label">Factor of target:</span> <span id="target-val">12</span></div>
-            <div id="score-display">Score: <span id="score">0</span> / <span id="goal-score">1000</span></div>
+            <div id="target-display"><span id="target-label">Factor of:</span> <span id="target-val">12</span></div>
+            <div id="score-display">Score: <span id="score">0</span></div>
             <div id="health-display">HP: <span id="hp">❤❤❤</span></div>
         </div>
 
         <div id="factor-checklist" style="display: none;">
-            Factors to find: <span id="checklist-items"></span>
+            Status: <span id="checklist-items"></span>
+        </div>
+
+        <!-- 排名榜姓名輸入 -->
+        <div id="name-input-container">
+            <h3>NEW HIGH SCORE!</h3>
+            <p>Enter your name:</p>
+            <input type="text" id="player-name-input" maxlength="10" placeholder="Your Name">
+            <br>
+            <button id="submit-score-btn">SUBMIT</button>
         </div>
 
         <canvas id="gameCanvas"></canvas>
 
         <div id="instructions" style="display: none;">
-            [Arrow Keys] Move | [Click] Shoot | Collect all factors!
+            [Arrows] Move | [Tap] Shoot | Find all factors to exit!
         </div>
     </div>
     <script src="game.js"></script>
