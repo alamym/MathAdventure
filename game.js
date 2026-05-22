@@ -220,13 +220,19 @@ function initBossMode() {
     }
 
     const roomNumbers = new Set();
-    for (let i = 0; i < 12; i++) {
-        let isM = Math.random() > 0.5;
+    let multiplesCount = 0;
+    const requiredMultiples = 6; // 確保至少有 6 個正確答案
+
+    for (let i = 0; i < 14; i++) {
+        // 前幾個如果正確答案不夠，就強制產生正確答案
+        let isM = (multiplesCount < requiredMultiples) ? true : Math.random() > 0.6;
         let n;
+
         if (isM) {
-            n = targetNum * (Math.floor(Math.random() * 6) + 1);
+            n = targetNum * (Math.floor(Math.random() * 8) + 1);
+            multiplesCount++;
         } else {
-            do { n = Math.floor(Math.random() * 100) + 1; } while (n % targetNum === 0 || roomNumbers.has(n));
+            do { n = Math.floor(Math.random() * 120) + 1; } while (n % targetNum === 0 || roomNumbers.has(n));
         }
 
         let posX, posY, attempts = 0;
@@ -361,16 +367,13 @@ function drawWarrior(x, y) {
     ctx.fillRect(x + 8, y + 4, 3, 3);
     ctx.fillRect(x + 14, y + 4, 3, 3);
 
-    // 戰士頭頂血條 (3 次機會)
     const barWidth = 30;
     const barHeight = 4;
     const bx = x + (player.width / 2) - (barWidth / 2);
     const by = y - 10;
 
-    // 背景
     ctx.fillStyle = '#0f380f';
     ctx.fillRect(bx, by, barWidth, barHeight);
-    // 紅色血量
     ctx.fillStyle = '#d40000';
     ctx.fillRect(bx, by, (hp / 3) * barWidth, barHeight);
 }
@@ -389,7 +392,7 @@ function drawBoss() {
     ctx.beginPath(); ctx.arc(bx + 60, by + 70, 25, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#0f380f';
     ctx.beginPath(); ctx.arc(bx + 60, by + 70, 10, 0, Math.PI * 2); ctx.fill();
-    // Health Bar
+
     ctx.fillStyle = '#0f380f';
     ctx.fillRect(VIRTUAL_WIDTH - 200, 50, 150, 20);
     ctx.fillStyle = '#d40000';
