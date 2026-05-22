@@ -39,7 +39,7 @@ function resizeCanvas() {
 
     canvas.width = newWidth;
     canvas.height = newHeight;
-    scale = newWidth / VIRTUAL_WIDTH;
+    scale = Math.max(newWidth / VIRTUAL_WIDTH, 0.1);
 }
 
 window.addEventListener('resize', resizeCanvas);
@@ -239,7 +239,7 @@ function handleShot(sx, sy) {
             }
             if (!isBossMode) gameObjects.splice(i, 1);
             scoreDisplay.innerText = score;
-            updateChecklist();
+            updateUI();
             break;
         }
     }
@@ -271,11 +271,27 @@ function resetGame() {
     hud.style.display = 'none';
     factorChecklist.style.display = 'none';
     instructions.style.display = 'none';
+    nameInputContainer.style.display = 'none';
+    player.x = 100; player.y = 250;
+    score = 0;
+    hp = 3;
+    roomCount = 1;
+    cycleCount = 1;
+    startTime = Date.now();
+    initRoom();
+    updateUI();
 }
 
 function update() {
-    if (gameState !== 'PLAYING') return;
+    if (gameState !== 'PLAYING') {
+        if ((gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'LEADERBOARD') && keys['Space']) {
+            resetGame();
+        }
+        return;
+    }
+
     elapsedTime = Date.now() - startTime;
+
     if (lastShot.timer > 0) lastShot.timer--;
     if (bossShake > 0) bossShake--;
 
@@ -317,9 +333,9 @@ function draw() {
         ctx.fillStyle = '#0f380f';
         ctx.fillRect(player.x, player.y, player.width, player.height);
 
-        // 畫數字
+        // 畫數字 (統一顏色)
         gameObjects.forEach(obj => {
-            ctx.fillStyle = '#0f380f';
+            ctx.fillStyle = '#0f380f'; // Unified color for all numbers
             ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
             ctx.fillStyle = '#9bbc0f';
             ctx.font = 'bold 20px Arial';
@@ -342,7 +358,7 @@ function draw() {
         ctx.font = '20px Arial';
         const lb = getLeaderboard().slice(0, 10);
         lb.forEach((r, i) => {
-            ctx.fillText(`${i+1}. ${r.name}: ${r.score} (Lvl ${r.level})`, VIRTUAL_WIDTH/2, 170 + i*25);
+            ctx.fillText(`${i+1}. ${r.name}: ${r.score}`, VIRTUAL_WIDTH/2, 170 + i*25);
         });
     }
 
