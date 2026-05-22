@@ -23,6 +23,58 @@ const VIRTUAL_WIDTH = 800;
 const VIRTUAL_HEIGHT = 500;
 let scale = 1;
 
+const THEMES = {
+    forest: {
+        darkest: '#0f380f',
+        dark: '#306230',
+        light: '#8bac0f',
+        lightest: '#9bbc0f',
+        health: '#d40000'
+    },
+    ocean: {
+        darkest: '#01579b',
+        dark: '#0277bd',
+        light: '#81d4fa',
+        lightest: '#e0f7fa',
+        health: '#ffd600'
+    },
+    monochrome: {
+        darkest: '#222222',
+        dark: '#666666',
+        light: '#cccccc',
+        lightest: '#ffffff',
+        health: '#eeeeee'
+    }
+};
+
+let currentTheme = localStorage.getItem('math_adventure_theme') || 'forest';
+let COLORS = { ...THEMES[currentTheme] };
+
+function setTheme(themeName) {
+    if (!THEMES[themeName]) return;
+    currentTheme = themeName;
+    COLORS = { ...THEMES[themeName] };
+    localStorage.setItem('math_adventure_theme', themeName);
+
+    // Apply CSS variables via class
+    document.body.className = themeName === 'forest' ? '' : `theme-${themeName}`;
+
+    // Update Theme Buttons UI
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        if (btn.dataset.theme === themeName) {
+            btn.classList.add('active');
+            btn.style.background = COLORS.darkest;
+            btn.style.color = COLORS.lightest;
+            btn.style.borderColor = COLORS.darkest;
+        } else {
+            btn.classList.remove('active');
+            btn.style.background = COLORS.dark;
+            btn.style.color = COLORS.light;
+            btn.style.borderColor = COLORS.darkest;
+        }
+    });
+}
+
 function resizeCanvas() {
     const containerWidth = window.innerWidth;
     const containerHeight = window.innerHeight;
@@ -114,6 +166,14 @@ submitScoreBtn.addEventListener('click', () => {
     nameInputContainer.style.display = 'none';
     gameState = 'LEADERBOARD';
 });
+
+// 主題切換事件
+document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => setTheme(btn.dataset.theme));
+});
+
+// 初始化主題
+setTheme(currentTheme);
 
 function startGame() {
     gameState = 'PLAYING';
@@ -356,14 +416,14 @@ function update() {
 }
 
 function drawWarrior(x, y) {
-    ctx.fillStyle = '#0f380f';
+    ctx.fillStyle = COLORS.darkest;
     ctx.fillRect(x + 6, y, 12, 12);
     ctx.fillRect(x + 2, y + 12, 21, 18);
     ctx.fillRect(x, y + 15, 4, 15);
     ctx.fillRect(x + 21, y + 15, 4, 15);
     ctx.fillRect(x + 4, y + 30, 6, 10);
     ctx.fillRect(x + 15, y + 30, 6, 10);
-    ctx.fillStyle = '#9bbc0f';
+    ctx.fillStyle = COLORS.lightest;
     ctx.fillRect(x + 8, y + 4, 3, 3);
     ctx.fillRect(x + 14, y + 4, 3, 3);
 
@@ -372,30 +432,30 @@ function drawWarrior(x, y) {
     const bx = x + (player.width / 2) - (barWidth / 2);
     const by = y - 10;
 
-    ctx.fillStyle = '#0f380f';
+    ctx.fillStyle = COLORS.darkest;
     ctx.fillRect(bx, by, barWidth, barHeight);
-    ctx.fillStyle = '#d40000';
+    ctx.fillStyle = COLORS.health;
     ctx.fillRect(bx, by, (hp / 3) * barWidth, barHeight);
 }
 
 function drawBoss() {
     const bx = (VIRTUAL_WIDTH - 180) + (Math.random() * bossShake);
     const by = 100 + (Math.random() * bossShake);
-    ctx.fillStyle = '#0f380f';
+    ctx.fillStyle = COLORS.darkest;
     ctx.beginPath();
     ctx.moveTo(bx, by + 50); ctx.lineTo(bx + 60, by); ctx.lineTo(bx + 120, by + 50);
     ctx.lineTo(bx + 120, by + 150); ctx.lineTo(bx, by + 150);
     ctx.fill();
     ctx.fillRect(bx + 10, by - 20, 15, 30);
     ctx.fillRect(bx + 95, by - 20, 15, 30);
-    ctx.fillStyle = '#9bbc0f';
+    ctx.fillStyle = COLORS.lightest;
     ctx.beginPath(); ctx.arc(bx + 60, by + 70, 25, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#0f380f';
+    ctx.fillStyle = COLORS.darkest;
     ctx.beginPath(); ctx.arc(bx + 60, by + 70, 10, 0, Math.PI * 2); ctx.fill();
 
-    ctx.fillStyle = '#0f380f';
+    ctx.fillStyle = COLORS.darkest;
     ctx.fillRect(VIRTUAL_WIDTH - 200, 50, 150, 20);
-    ctx.fillStyle = '#d40000';
+    ctx.fillStyle = COLORS.health;
     ctx.fillRect(VIRTUAL_WIDTH - 200, 50, (bossHp / 100) * 150, 20);
 }
 
@@ -406,28 +466,28 @@ function draw() {
 
     if (gameState === 'PLAYING') {
         if (doorOpen || isExiting) {
-            ctx.fillStyle = '#0f380f';
+            ctx.fillStyle = COLORS.darkest;
             ctx.fillRect(VIRTUAL_WIDTH - 40, VIRTUAL_HEIGHT/2 - 50, 40, 100);
         }
         drawWarrior(player.x, player.y);
         if (isBossMode && bossHp > 0) drawBoss();
         gameObjects.forEach(obj => {
-            ctx.fillStyle = '#0f380f';
+            ctx.fillStyle = COLORS.darkest;
             ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
-            ctx.fillStyle = '#9bbc0f';
+            ctx.fillStyle = COLORS.lightest;
             ctx.font = 'bold 20px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(obj.number, obj.x + obj.width/2, obj.y + obj.height/2 + 7);
         });
         if (lastShot.timer > 0) {
-            ctx.strokeStyle = '#0f380f';
+            ctx.strokeStyle = COLORS.darkest;
             ctx.beginPath();
             ctx.moveTo(player.x + player.width/2, player.y + player.height/2);
             ctx.lineTo(lastShot.x, lastShot.y);
             ctx.stroke();
         }
     } else if (gameState === 'GAMEOVER' || gameState === 'WIN' || gameState === 'LEADERBOARD') {
-        ctx.fillStyle = '#0f380f';
+        ctx.fillStyle = COLORS.darkest;
         ctx.textAlign = 'center';
 
         if (gameState === 'LEADERBOARD') {
