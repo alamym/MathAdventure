@@ -50,6 +50,49 @@ const THEMES = {
 let currentTheme = localStorage.getItem('math_adventure_theme') || 'forest';
 let COLORS = { ...THEMES[currentTheme] };
 
+// --- 音效系統 ---
+let audioCtx = null;
+let soundEnabled = true;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function playTone(freq, type, duration, slideTo = 0) {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        if (slideTo > 0) {
+            osc.frequency.exponentialRampToValueAtTime(slideTo, audioCtx.currentTime + duration);
+        }
+
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch (e) { console.error("Audio error:", e); }
+}
+
+const sounds = {
+    shoot: () => playTone(880, 'square', 0.1, 110),
+    hit: () => playTone(660, 'square', 0.05),
+    error: () => playTone(110, 'triangle', 0.3),
+    bossHit: () => playTone(220, 'square', 0.2, 55)
+};
+
 function setTheme(themeName) {
     if (!THEMES[themeName]) return;
     currentTheme = themeName;
@@ -172,10 +215,36 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', () => setTheme(btn.dataset.theme));
 });
 
+// 音效切換事件
+const soundBtn = document.getElementById('sound-btn');
+soundEnabled = localStorage.getItem('math_adventure_sound') !== 'false';
+
+function updateSoundUI() {
+    if (soundBtn) {
+        soundBtn.innerText = soundEnabled ? "🔊 ON" : "🔇 OFF";
+        if (soundEnabled) soundBtn.classList.remove('muted');
+        else soundBtn.classList.add('muted');
+    }
+}
+
+if (soundBtn) {
+    soundBtn.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        localStorage.setItem('math_adventure_sound', soundEnabled);
+        updateSoundUI();
+        if (soundEnabled) {
+            initAudio();
+            sounds.hit();
+        }
+    });
+}
+updateSoundUI();
+
 // 初始化主題
 setTheme(currentTheme);
 
 function startGame() {
+    initAudio();
     gameState = 'PLAYING';
     gameActive = true;
     startScreen.style.display = 'none';
@@ -289,11 +358,14 @@ function initBossMode() {
         let n;
 
         if (isM) {
-            n = targetNum * (Math.floor(Math.random() * 8) + 1);
+            do {
+                n = targetNum * (Math.floor(Math.random() * 12) + 1);
+            } while (roomNumbers.has(n));
             multiplesCount++;
         } else {
             do { n = Math.floor(Math.random() * 120) + 1; } while (n % targetNum === 0 || roomNumbers.has(n));
         }
+        roomNumbers.add(n); // 立即加入 Set 以防重複
 
         let posX, posY, attempts = 0;
         do {
@@ -307,21 +379,23 @@ function initBossMode() {
             number: n,
             isDistractor: !(n % targetNum === 0)
         });
-        roomNumbers.add(n);
     }
 }
 
 function handleShot(sx, sy) {
     if (!gameActive || isEntering || isExiting) return;
     lastShot = { x: sx, y: sy, timer: 10 };
+    sounds.shoot();
 
     for (let i = gameObjects.length - 1; i >= 0; i--) {
         const obj = gameObjects[i];
         if (sx >= obj.x && sx <= obj.x + obj.width && sy >= obj.y && sy <= obj.y + obj.height) {
             if (!obj.isDistractor) {
                 score += 20;
+                sounds.hit();
                 if (isBossMode) {
                     bossHp -= 25; bossShake = 15;
+                    sounds.bossHit();
                     gameObjects.splice(i, 1);
                     if (bossHp <= 0) {
                         score += 500;
@@ -342,6 +416,7 @@ function handleShot(sx, sy) {
                 }
             } else {
                 hp--;
+                sounds.error();
                 if (!isBossMode) gameObjects.splice(i, 1);
                 if (hp <= 0) endGame();
             }
